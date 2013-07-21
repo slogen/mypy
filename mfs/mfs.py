@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Shell commands to stop mfs
+# Handy shell commands to stop mfs
 #  ps ax | grep 'python ./mfs.py' | grep -v grep | awk '{print $1;}' | xargs -r kill
 
 # Standard libraries
@@ -83,7 +83,11 @@ class Dir(Node, dict):
                 yield x, xdirs, xfiles
         if not topdown: yield (here, dirs, files)
     def get(self, path, default = -errno.ENOENT, make_sub = None):
-        """Recursive get sub-path. path can be str, unicode or seq of parts"""
+        """Recursive get sub-path. path can be str, unicode or seq of parts
+
+If the head of path is not found the get will either return default or
+invoke make_sub(self, head) to create a sub-directory.
+"""
         path = Path(path)
         head = path.head
         if head == '':
@@ -93,14 +97,16 @@ class Dir(Node, dict):
             if make_sub is None:
                 return default
             else:
-                sub = make_sub(head)
+                sub = make_sub(self, head)
                 self[head] = sub
         tail = path.tail
         if len(tail) > 0:
             sub = sub.get(tail, default = default, make_sub = make_sub)
         return sub
     def __getitem__(self, path):
-        """Dispatch to get, but raise IOError(errno.ENOENT) instead of KeyError"""
+        """Dispatch to self.get
+
+Raises IOError(errno.ENOENT) instead of  the usual KeyError"""
         i = self.get(path, default = None)
         if i is None:
             raise IOError(errno.ENOENT, "%s does not exist" % path)
@@ -220,17 +226,23 @@ class Recordings:
                     self.stream = None
 
     def find(self, root = None, existing = None, **kwargs):
-        """Find recordings matching **kwargs. Reuse existing Rec objects if found"""
+        """Find recordings matching **kwargs. 
+
+Reuses existing Rec objects if passed"""
         if root is None:
             root = Dir(name = "")
-        items = ((self.format_recording(x), x) for x in self.db.searchRecorded(**kwargs))
+        items = ((self.format_recording(x), x) 
+                 for x in self.db.searchRecorded(**kwargs))
         
         for path, recording in items:
             path = Path(path)
             basename = path.basename
-            rec = ((existing is not None and existing.get(path, default = None)) 
+            rec = ((existing is not None 
+                    and existing.get(path, default = None)) 
                    or self.Rec(name = basename, recording = recording))
-            root.get(path.dirparts, make_sub = Dir)[basename] = rec
+            root.get(
+                path.dirparts, 
+                make_sub = lambda x,h: Dir(h))[basename] = rec
         return root
 
 class MFS(fuse.Fuse):
@@ -245,7 +257,7 @@ class MFS(fuse.Fuse):
 
     def _calculate(self):
         root = Dir("")
-        # Add recordings
+        # Add recordings (this should be much easier... will have to refactor)
         root["Recordings"] = Recordings(db = self.db).find(
             root = Dir("Recordings"),
             existing = self.get("Recordings", default = None)) 
@@ -267,10 +279,10 @@ class MFS(fuse.Fuse):
         #sys.settrace(_tracefunc_top)
         pass
     
-    # Simple path dispatch
+    # Simple path dispatch. Could not make the fuse file_class work
     def getattr(self, path): return self[path]
     def readdir(self, path, offset = None): return self[path].values()
-    def read(self, path, length, offset): 
+    def read(self, path, length, offset):
         return self[path].read(length = length, offset = offset)
     def release(self, path, flags): return self[path].release(flags)
     def fsync(self, path, isfsyncfile): return 0
