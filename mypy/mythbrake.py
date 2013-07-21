@@ -2,7 +2,6 @@
 
 import sys, os, os.path, re, datetime, shutil, collections, subprocess
 
-link_format = "/mnt/store/Incoming/tmp/%(link_name)s.mp4"
 default_options = """
 -f mp4 --preset Android -q 20 -Y 720 -X 720 --decomb --loose-anamorphic
 -N dan --native-dub
@@ -89,10 +88,8 @@ class Optional:
             args = [arg for arg in leaves([prefix, args]) if arg is not None]
             if self.do_print:
                 q = self._print_quote
-                print "*** ", \
-                    " ".join(q(x) for x in args),
+                print "*** ", " ".join(q(x) for x in args)
             if self.dry_run is not None and not self.dry_run:
-                print "+++", args
                 return subprocess.check_call(args)
         return call
     def fn(self, f):
@@ -103,7 +100,8 @@ class Optional:
                     ", ".join(q(x) for x in args), \
                     ", ".join("%s=%s" % (q(k), q(v))
                               for k,v in kwargs.items())
-            f(*args, **kwargs)
+            if self.dry_run is not None and not self.dry_run:
+                return f(*args, **kwargs)
         return call
 
 def update_marks(p):
@@ -114,7 +112,7 @@ def update_marks(p):
     p.cutlist = 0
     p.update()
 
-opt = Optional(dry_run = False, do_print = True)
+opt = Optional(dry_run = True, do_print = True)
 
 handbrake = opt.sub(prefix = ['ionice', '-c', '3', 'HandBrakeCLI'])
 symlink = opt.fn(os.symlink)
@@ -154,16 +152,9 @@ def _transcode(program,
     mark(program)
     return dst_path
 
-def _autolink(p, dst_path = None):
-    if dst_path is None:
-        dst_path = os.path.join(*dirfile(p))
-    link_name = formatfile(p)
-    symlink(dst_path, link_format % locals())
-
 def act(p, force_transcode = None):
     if force_transcode or (not p.transcoded) or p.cutlist:
         _transcode(p)
-    _autolink(p)
 
 def act_all(programs, force_transcode = None):
     errors = 0
@@ -179,18 +170,34 @@ def act_all(programs, force_transcode = None):
 
 def main(argv):
     query = {}
-    if len(argv) == 1:
-        if argv[0] == '--2cuts':
-            programs = [p for p in list(db.searchRecorded())
-                        if p.cutlist and len(p.markup.getuncutlist()) == 2]
+    it = iter(argv)
+    force_transcode = None
+    programs = []
+    for arg in it:
+        if arg in ["--dry-run", "--dry", "-D"]:
+            opt.dry_run = True
+        elif arg in ["--act"]:
+            opt.dry_run = False
+        elif arg in ["--verbose", "-v"]:
+            opt.do_print = True
+        elif arg in ["--quiet", "-q"]:
+            opt.do_print = False
+        elif arg in ["--force", "-f"]:
+            force_transcode = True
+        elif arg in ["--2-cuts", "--2-cuts", "-2"]:
+            programs.extend(
+                p for p in list(db.searchRecorded())
+                if p.cutlist and len(p.markup.getuncutlist()) == 2)
         else:
-            programs = db.searchRecorded(basename = os.path.basename(argv[0]))
-    else:
-        raise Exception("Invalid arguments", argv)
-    act_all(programs)
+            r = list(db.searchRecorded(basename = os.path.basename(arg)))
+            if not r:
+                raise Exception("Recording not found", arg)
+            programs.extend(r)
+    return act_all(programs, force_transcode = force_transcode)
 
 if __name__ == '__main__':
     if sys.argv in [["-c"]]:
-        main(["/var/lib/mythtv/recordings/1003_20130611220100.mpg"])
+        #print main(["-f", "--dry-run", "-v", "/var/lib/mythtv/recordings/1003_20130611220100.mpg"])
+        print main(["--dry-run", "-v", "-2"])
     else:
         sys.exit(main(sys.argv[1:]))
