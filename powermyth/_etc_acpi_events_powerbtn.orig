@@ -1,0 +1,8 @@
+# /etc/acpi/events/powerbtn
+
+# Powerbutton script installed by powermyth. Look for the "old" one
+# with a .pre_powermyth extension
+
+event=button[ /]power
+action=${bin}powerbtn
+

@@ -1,0 +1,42 @@
+CHEAT SHEET:
+
+First, make sure you have acpi working. For debian that is something like:
+
+$ sudo apt-get install acpid
+
+Install powermyth:
+
+$ sudo make install prefix=/
+
+sudo is needed to install stuff into /etc (including sudoers, read the code :)
+
+The prefix=/ is required as a security precaution.
+
+If you are running GNOME then may need to disable the default
+behaviour of asking the X11 user what to do when the power-button is
+pressed:
+
+$ gsettings set org.gnome.settings-daemon.plugins.power button-power nothing
+
+DESCRIPTION:
+
+This will setup your power-button to turn off your computer, unless it
+is recording or soon will be. It will set the real-time clock to wake
+up the machine again when you need to record.
+
+INSTALLATION PROCEDURE:
+
+1. put mythwake and powerbtn somewhere (prefix=/ means /usr/bin)
+
+2. mythwake should be run with sufficient provileges. Usually, this
+means root (in order to write to /sys/class/rtc/rtc0/wakealarm). The
+Makefile allows members of group mythtv to do that by putting a file
+in /etc/sudoers.d.
+
+3. configure acpi so that it will run the supplied "powerbtn"
+script. The makefile does this by overwriting (actually backing up :)
+/etc/acpi/events/powerbtn. I was unable to find a way to inject this
+functionality into the standard scripts in /etc/acpi/powerbtn.sh
+
+
+

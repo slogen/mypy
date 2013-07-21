@@ -1,0 +1,2 @@
+%mythtv ALL=NOPASSWD: ${bin}mythwake
+%mythtv ALL=NOPASSWD: /sbin/shutdown
