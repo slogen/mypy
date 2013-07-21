@@ -2,7 +2,6 @@
 
 import sys, os, os.path, re, datetime, shutil, collections, subprocess
 
-link_format = "/mnt/store/Incoming/tmp/%(link_name)s.mp4"
 default_options = """
 -f mp4 --preset Android -q 20 -Y 720 -X 720 --decomb --loose-anamorphic
 -N dan --native-dub
@@ -117,7 +116,6 @@ def update_marks(p):
 opt = Optional(dry_run = False, do_print = True)
 
 handbrake = opt.sub(prefix = ['ionice', '-c', '3', 'HandBrakeCLI'])
-symlink = opt.fn(os.symlink)
 move = opt.fn(shutil.move)
 mark = opt.fn(update_marks)
 
@@ -154,16 +152,9 @@ def _transcode(program,
     mark(program)
     return dst_path
 
-def _autolink(p, dst_path = None):
-    if dst_path is None:
-        dst_path = os.path.join(*dirfile(p))
-    link_name = formatfile(p)
-    symlink(dst_path, link_format % locals())
-
 def act(p, force_transcode = None):
     if force_transcode or (not p.transcoded) or p.cutlist:
         _transcode(p)
-    _autolink(p)
 
 def act_all(programs, force_transcode = None):
     errors = 0
