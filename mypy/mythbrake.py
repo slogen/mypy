@@ -83,14 +83,15 @@ class Optional:
             return pipes.quote(str(o))
         else:
             return str(o)
-    def sub(self, prefix = None):
+    def sub(self, prefix = None, sub = subprocess.check_call, 
+            force_run = None):
         def call(*args):
             args = [arg for arg in leaves([prefix, args]) if arg is not None]
             if self.do_print:
                 q = self._print_quote
                 print "*** ", " ".join(q(x) for x in args)
-            if self.dry_run is not None and not self.dry_run:
-                return subprocess.check_call(args)
+            if force_run or (self.dry_run is not None and not self.dry_run):
+                return sub(args)
         return call
     def fn(self, f):
         def call(*args, **kwargs):
@@ -118,6 +119,7 @@ handbrake = opt.sub(prefix = ['ionice', '-c', '3', 'HandBrakeCLI'])
 symlink = opt.fn(os.symlink)
 move = opt.fn(shutil.move)
 mark = opt.fn(update_marks)
+shfile = opt.sub(prefix = '/usr/bin/file', force_run = True, sub = subprocess.check_output) 
 
 def dirfile(p):
     keys = { 'groupname': p.storagegroup, 'hostname': p.hostname }
@@ -152,9 +154,18 @@ def _transcode(program,
     mark(program)
     return dst_path
 
+def looks_transcoded(p):
+    return re.search("MPEG.*v4", shfile(os.path.join(*dirfile(p))))
+
 def act(p, force_transcode = None):
-    if force_transcode or (not p.transcoded) or p.cutlist:
-        _transcode(p)
+    if force_transcode or not looks_transcoded(p) or p.cutlist:
+        try:
+            _transcode(p)
+        except:
+            print "Transcode Failed", p
+        else:
+            print "Transcode OK", p
+        
 
 def act_all(programs, force_transcode = None):
     errors = 0
@@ -197,7 +208,9 @@ def main(argv):
 
 if __name__ == '__main__':
     if sys.argv in [["-c"]]:
-        #print main(["-f", "--dry-run", "-v", "/var/lib/mythtv/recordings/1003_20130611220100.mpg"])
-        print main(["--dry-run", "-v", "-2"])
+        print main(
+            #["-f", -"-D", "-v", "1003_20130611220100.mpg"]
+            ["--dry-run", "-2"]
+            )
     else:
         sys.exit(main(sys.argv[1:]))
